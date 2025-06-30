@@ -9,7 +9,19 @@ import (
 	"github.com/mjossany/Chirpy/internal/database"
 )
 
+type userResponse struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
 func (cfg *Config) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	type createUserRequest struct {
 		Email string `json:"email"`
 	}
@@ -37,13 +49,7 @@ func (cfg *Config) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type UserResponse struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-	}
-	resp := UserResponse{
+	resp := userResponse{
 		ID:        user.ID,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,

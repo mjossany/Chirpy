@@ -11,12 +11,12 @@ import (
 	"github.com/mjossany/Chirpy/internal/database"
 )
 
-type createChirpRequest struct {
+type chirpRequest struct {
 	Body   string    `json:"body"`
 	UserId uuid.UUID `json:"user_id"`
 }
 
-type createChirpResponse struct {
+type chirpResponse struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -30,7 +30,7 @@ func (cfg *Config) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request createChirpRequest
+	var request chirpRequest
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&request)
 	if err != nil {
@@ -55,7 +55,7 @@ func (cfg *Config) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := createChirpResponse{
+	resp := chirpResponse{
 		ID:        chirp.ID,
 		CreatedAt: chirp.CreatedAt,
 		UpdatedAt: chirp.UpdatedAt,
@@ -65,7 +65,33 @@ func (cfg *Config) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, resp)
 }
 
-func validateChirp(request createChirpRequest, w http.ResponseWriter) {
+func (cfg *Config) handleGetAllChirps(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	chirps, err := cfg.DB.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error retrieving chirps", err)
+		return
+	}
+
+	response := []chirpResponse{}
+	for _, chirp := range chirps {
+		response = append(response, chirpResponse{
+			ID:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserId:    chirp.UserID,
+		})
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
+}
+
+func validateChirp(request chirpRequest, w http.ResponseWriter) {
 	const maxChirpLength = 140
 	if len(request.Body) > maxChirpLength {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
