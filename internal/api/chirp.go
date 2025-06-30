@@ -91,6 +91,41 @@ func (cfg *Config) handleGetAllChirps(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, response)
 }
 
+func (cfg *Config) handleGetChirpById(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	chirpIDString := r.PathValue("chirpID")
+	if chirpIDString == "" {
+		respondWithError(w, http.StatusBadRequest, "Chirp ID is required", nil)
+		return
+	}
+
+	chirpID, err := uuid.Parse(chirpIDString)
+	if err != nil {
+		respondWithError(w, http.StatusBadGateway, "Invalid chirp ID", err)
+		return
+	}
+
+	chirp, err := cfg.DB.GetChirpById(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Chirp not found", err)
+		return
+	}
+
+	response := chirpResponse{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserId:    chirp.UserID,
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
+}
+
 func validateChirp(request chirpRequest, w http.ResponseWriter) {
 	const maxChirpLength = 140
 	if len(request.Body) > maxChirpLength {
