@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -14,43 +15,117 @@ func TestJWT(t *testing.T) {
 	const wrongSecret = "wrong-secret"
 	userID := uuid.New()
 
-	t.Run("Create and Validate JWT - success", func(t *testing.T) {
-		tokenString, err := MakeJWT(userID, secret, time.Hour)
-		if err != nil {
-			t.Fatalf("unexpected error creating JWT: %v", err)
-		}
+	tests := []struct {
+		name              string
+		expiresIn         time.Duration
+		validationSecret  string
+		expectedErr       error
+		expectUserIDMatch bool
+	}{
+		{
+			name:              "Create and Validate JWT - success",
+			expiresIn:         time.Hour,
+			validationSecret:  secret,
+			expectedErr:       nil,
+			expectUserIDMatch: true,
+		},
+		{
+			name:             "Expired token",
+			expiresIn:        -time.Hour,
+			validationSecret: secret,
+			expectedErr:      jwt.ErrTokenExpired,
+		},
+		{
+			name:             "Wrong secret",
+			expiresIn:        time.Hour,
+			validationSecret: wrongSecret,
+			expectedErr:      jwt.ErrTokenSignatureInvalid,
+		},
+	}
 
-		validatedUserID, err := ValidateJWT(tokenString, secret)
-		if err != nil {
-			t.Fatalf("unexpected error validating JWT: %v", err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenString, err := MakeJWT(userID, secret, tt.expiresIn)
+			if err != nil {
+				t.Fatalf("unexpected error creating JWT: %v", err)
+			}
 
-		if validatedUserID != userID {
-			t.Errorf("expected user ID %q, got %q", userID, validatedUserID)
-		}
-	})
+			validatedUserID, err := ValidateJWT(tokenString, tt.validationSecret)
 
-	t.Run("Expired token", func(t *testing.T) {
-		tokenString, err := MakeJWT(userID, secret, -time.Hour)
-		if err != nil {
-			t.Fatalf("unexpected error creating expired JWT: %v", err)
-		}
+			if tt.expectedErr != nil {
+				if !errors.Is(err, tt.expectedErr) {
+					t.Fatalf("expected error '%v', but got '%v'", tt.expectedErr, err)
+				}
+				return
+			}
 
-		_, err = ValidateJWT(tokenString, secret)
-		if !errors.Is(err, jwt.ErrTokenExpired) {
-			t.Fatalf("expected error for expired token, but got: %v", err)
-		}
-	})
+			if err != nil {
+				t.Fatalf("unexpected error validating JWT: %v", err)
+			}
 
-	t.Run("Wrong secret", func(t *testing.T) {
-		tokenString, err := MakeJWT(userID, secret, time.Hour)
-		if err != nil {
-			t.Fatalf("unexpected error creating JWT: %v", err)
-		}
+			if tt.expectUserIDMatch && validatedUserID != userID {
+				t.Errorf("expected user ID %q, got %q", userID, validatedUserID)
+			}
+		})
+	}
+}
 
-		_, err = ValidateJWT(tokenString, wrongSecret)
-		if !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
-			t.Fatalf("expected error for wrong secret, but got: %v", err)
-		}
-	})
+func TestGetBearerToken(t *testing.T) {
+	tests := []struct {
+		name          string
+		header        http.Header
+		expectedToken string
+		expectError   bool
+	}{
+		{
+			name: "Valid token",
+			header: http.Header{
+				"Authorization": {"Bearer my-token"},
+			},
+			expectedToken: "my-token",
+			expectError:   false,
+		},
+		{
+			name:          "No auth header",
+			header:        http.Header{},
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name: "Malformed header - no Bearer prefix",
+			header: http.Header{
+				"Authorization": {"my-token"},
+			},
+			expectedToken: "",
+			expectError:   true,
+		},
+		{
+			name: "Valid header - empty token",
+			header: http.Header{
+				"Authorization": {"Bearer "},
+			},
+			expectedToken: "",
+			expectError:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, err := GetBearerToken(tt.header)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected an error, but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+
+			if token != tt.expectedToken {
+				t.Errorf("expected token '%s', got '%s'", tt.expectedToken, token)
+			}
+		})
+	}
 }
