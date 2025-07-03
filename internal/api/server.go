@@ -12,6 +12,7 @@ type Config struct {
 	DB             *database.Queries
 	Platform       string
 	Port           string
+	TokenSecret    string
 }
 
 func NewRouter(cfg *Config, filepathRoot string) http.Handler {

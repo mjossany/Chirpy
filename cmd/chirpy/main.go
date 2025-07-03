@@ -31,6 +31,7 @@ func main() {
 		DB:             dbQueries,
 		Platform:       os.Getenv("PLATFORM"),
 		Port:           os.Getenv("PORT"),
+		TokenSecret:    os.Getenv("TOKEN_SECRET"),
 	}
 
 	if cfg.Port == "" {
