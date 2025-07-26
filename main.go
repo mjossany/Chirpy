@@ -25,9 +25,9 @@ func main() {
 	}
 
 	serverMux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
-	serverMux.HandleFunc("GET /healthz", handleHealthCheck)
-	serverMux.HandleFunc("GET /metrics", apiCfg.handleMetrics)
-	serverMux.HandleFunc("POST /reset", apiCfg.handleReset)
+	serverMux.HandleFunc("GET /api/healthz", handleHealthCheck)
+	serverMux.HandleFunc("GET /api/metrics", apiCfg.handleMetrics)
+	serverMux.HandleFunc("POST /api/reset", apiCfg.handleReset)
 
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(srv.ListenAndServe())
