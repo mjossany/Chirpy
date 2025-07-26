@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,6 +27,7 @@ func main() {
 
 	serverMux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
 	serverMux.HandleFunc("GET /api/healthz", handleHealthCheck)
+	serverMux.HandleFunc("POST /api/validate_chirp", handleChirpsValidation)
 	serverMux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
 	serverMux.HandleFunc("POST /admin/reset", apiCfg.handleReset)
 
@@ -37,6 +39,34 @@ func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(200)
 	w.Write([]byte(http.StatusText(http.StatusOK)))
+}
+
+func handleChirpsValidation(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	type returnVals struct {
+		Valid bool `json:"valid"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, 500, "Couldn't decode parameters", err)
+		return
+	}
+
+	const maxChirpLength = 140
+	if len(params.Body) > maxChirpLength {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, returnVals{
+		Valid: true,
+	})
 }
 
 func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
