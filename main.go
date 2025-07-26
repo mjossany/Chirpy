@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -47,7 +48,7 @@ func handleChirpsValidation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type returnVals struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -64,8 +65,22 @@ func handleChirpsValidation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	profaneWords := []string{"kerfuffle", "sharbert", "fornax"}
+	chirpWords := strings.Split(params.Body, " ")
+
+	for i, word := range chirpWords {
+		for _, pw := range profaneWords {
+			if pw == strings.ToLower(word) {
+				chirpWords[i] = "****"
+				break
+			}
+		}
+	}
+
+	validatedChirp := strings.Join(chirpWords, " ")
+
 	respondWithJSON(w, http.StatusOK, returnVals{
-		Valid: true,
+		CleanedBody: validatedChirp,
 	})
 }
 
