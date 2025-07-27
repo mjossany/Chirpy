@@ -1,25 +1,44 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
-	"strings"
+	"os"
 	"sync/atomic"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/mjossany/Chirpy/internal/database"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
 }
 
 func main() {
-	apiCfg := &apiConfig{}
-
-	serverMux := http.NewServeMux()
-
 	const port = "8080"
 	const filepathRoot = "."
+
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("DB_URL must be set")
+	}
+
+	dbConn, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatalf("Error opening database: %s", err)
+	}
+	dbQueries := database.New(dbConn)
+
+	apiCfg := &apiConfig{
+		fileserverHits: atomic.Int32{},
+		db:             dbQueries,
+	}
+
+	serverMux := http.NewServeMux()
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -34,79 +53,4 @@ func main() {
 
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(srv.ListenAndServe())
-}
-
-func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(200)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
-}
-
-func handleChirpsValidation(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Body string `json:"body"`
-	}
-
-	type returnVals struct {
-		CleanedBody string `json:"cleaned_body"`
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
-		respondWithError(w, 500, "Couldn't decode parameters", err)
-		return
-	}
-
-	const maxChirpLength = 140
-	if len(params.Body) > maxChirpLength {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
-		return
-	}
-
-	profaneWords := []string{"kerfuffle", "sharbert", "fornax"}
-	chirpWords := strings.Split(params.Body, " ")
-
-	for i, word := range chirpWords {
-		for _, pw := range profaneWords {
-			if pw == strings.ToLower(word) {
-				chirpWords[i] = "****"
-				break
-			}
-		}
-	}
-
-	validatedChirp := strings.Join(chirpWords, " ")
-
-	respondWithJSON(w, http.StatusOK, returnVals{
-		CleanedBody: validatedChirp,
-	})
-}
-
-func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(200)
-	w.Write([]byte(fmt.Sprintf(
-		`
-			<html>
-				<body>
-					<h1>Welcome, Chirpy Admin</h1>
-					<p>Chirpy has been visited %d times!</p>
-				</body>
-			</html>
-		`, cfg.fileserverHits.Load())))
-}
-
-func (cfg *apiConfig) handleReset(w http.ResponseWriter, r *http.Request) {
-	cfg.fileserverHits.Store(0)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Hits reseted to 0"))
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileserverHits.Add(1)
-		next.ServeHTTP(w, r)
-	})
 }
