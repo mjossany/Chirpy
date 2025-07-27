@@ -2,8 +2,8 @@ version: "3.8"
 
 services:
   db:
-    container_name: "chirpy-db"
-    image: postgres:12.4-alpine
+    container_name: "chirpy"
+    image: postgres:13-alpine
     volumes:
       - "./database/postgres-data:/var/lib/postgresql/data"
     ports:

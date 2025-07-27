@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"sync/atomic"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/mjossany/Chirpy/internal/database"
@@ -15,6 +17,14 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
+	platform       string
+}
+
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
 }
 
 func main() {
@@ -26,6 +36,10 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DB_URL must be set")
 	}
+	platform := os.Getenv("PLATFORM")
+	if platform == "" {
+		log.Fatal("PLATFORM must be set")
+	}
 
 	dbConn, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -36,6 +50,7 @@ func main() {
 	apiCfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
+		platform:       platform,
 	}
 
 	serverMux := http.NewServeMux()
@@ -46,8 +61,11 @@ func main() {
 	}
 
 	serverMux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
+
 	serverMux.HandleFunc("GET /api/healthz", handleHealthCheck)
 	serverMux.HandleFunc("POST /api/validate_chirp", handleChirpsValidation)
+	serverMux.HandleFunc("POST /api/users", apiCfg.handleUserCreation)
+
 	serverMux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
 	serverMux.HandleFunc("POST /admin/reset", apiCfg.handleReset)
 
