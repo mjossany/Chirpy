@@ -74,6 +74,7 @@ func main() {
 	serverMux.HandleFunc("POST /api/users", apiCfg.handleUserCreation)
 
 	serverMux.HandleFunc("GET /api/chirps", apiCfg.handleChirpList)
+	serverMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirp)
 	serverMux.HandleFunc("POST /api/chirps", apiCfg.handleChirpCreation)
 
 	serverMux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
