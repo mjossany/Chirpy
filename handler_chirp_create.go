@@ -5,19 +5,30 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/mjossany/Chirpy/internal/auth"
 	"github.com/mjossany/Chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handleChirpCreation(w http.ResponseWriter, r *http.Request) {
+	authorization, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "Invalid authorization", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(authorization, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, 401, "Invalid authorization", err)
+		return
+	}
+
 	type parameters struct {
-		Body   string `json:"body"`
-		UserId string `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, 500, "Couldn't decode parameters", err)
 		return
@@ -31,7 +42,6 @@ func (cfg *apiConfig) handleChirpCreation(w http.ResponseWriter, r *http.Request
 
 	cleanedChirp := cleanChirp(params.Body)
 
-	userID, err := uuid.Parse(params.UserId)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid user ID", err)
 		return
