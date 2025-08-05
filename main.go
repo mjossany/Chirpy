@@ -19,6 +19,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	jwtSecret      string
+	polkaKey       string
 }
 
 type User struct {
@@ -28,6 +29,7 @@ type User struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 }
 
 type Chirp struct {
@@ -63,12 +65,14 @@ func main() {
 	dbQueries := database.New(dbConn)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 
 	apiCfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
 		db:             dbQueries,
 		platform:       platform,
 		jwtSecret:      jwtSecret,
+		polkaKey:       polkaKey,
 	}
 
 	serverMux := http.NewServeMux()
@@ -94,6 +98,8 @@ func main() {
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirp)
 	serverMux.HandleFunc("POST /api/chirps", apiCfg.handleChirpCreation)
 	serverMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handleDeleteChirp)
+
+	serverMux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlePolkaWebhook)
 
 	serverMux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
 	serverMux.HandleFunc("POST /admin/reset", apiCfg.handleReset)
