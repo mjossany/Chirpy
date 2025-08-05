@@ -81,7 +81,9 @@ func main() {
 	serverMux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
 
 	serverMux.HandleFunc("GET /api/healthz", handleHealthCheck)
+
 	serverMux.HandleFunc("POST /api/users", apiCfg.handleUserCreation)
+	serverMux.HandleFunc("PUT /api/users", apiCfg.handleUserUpdate)
 
 	serverMux.HandleFunc("POST /api/login", apiCfg.handleUserLogin)
 
