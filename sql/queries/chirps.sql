@@ -13,6 +13,11 @@ RETURNING *;
 SELECT * FROM chirp
 WHERE id = $1;
 
+-- name: GetChirpsByUserID :many
+SELECT * FROM chirp
+WHERE user_id = $1
+ORDER BY created_at;
+
 -- name: GetAllChirps :many
 SELECT * FROM chirp
 ORDER BY created_at;
