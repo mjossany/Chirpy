@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/mjossany/Chirpy/internal/database"
@@ -13,6 +14,12 @@ func (cfg *apiConfig) handleChirpList(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	authorID := r.URL.Query().Get("author_id")
+	sortOrder := r.URL.Query().Get("sort")
+
+	if sortOrder == "" || (sortOrder != "asc" && sortOrder != "desc") {
+		sortOrder = "asc"
+	}
+
 	if authorID != "" {
 		authorUUID, err := uuid.Parse(authorID)
 		if err != nil {
@@ -43,6 +50,13 @@ func (cfg *apiConfig) handleChirpList(w http.ResponseWriter, r *http.Request) {
 			UserID:    dbChirp.UserID,
 		}
 	}
+
+	sort.Slice(responseChirps, func(i, j int) bool {
+		if sortOrder == "desc" {
+			return responseChirps[i].CreatedAt.After(responseChirps[j].CreatedAt)
+		}
+		return responseChirps[i].CreatedAt.Before(responseChirps[j].CreatedAt)
+	})
 
 	respondWithJSON(w, 200, responseChirps)
 }
